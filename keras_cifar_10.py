@@ -4,19 +4,27 @@ from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers.core import Dense
 from keras.optimizers import SGD
-from sklearn import datasets
+from keras.datasets import cifar10
 import numpy as np
 from matplotlib import pyplot as plt
+import pickle
 
-# grab the MNIST dataset (if this is your first time running this
-# script, the download may take a minute -- the 55MB MNIST dataset
-# will be downloaded)
-print("[INFO] loading MNIST (full) dataset...")
-dataset = datasets.fetch_mldata("MNIST Original")
 # scale the raw pixel intensities to the range [0, 1.0], then
 # construct the training and testing splits
-data = dataset.data.astype("float") / 255.0
-(trainX, testX, trainY, testY) = train_test_split(data, dataset.target, test_size=0.25)
+def unpickle(file):
+    with open(file, 'rb') as f:
+        dict = pickle.load(f, encoding='bytes')
+    return dict
+
+
+path_to_cifar_dataset = "/home/nik-96/Documents/cifar10/cifar-10-batches-py/"
+batch_list = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5",]
+batch_data = []
+for i in range(len(batch_list)):
+    trainX = unpickle(path_to_cifar_dataset + "{}".format(batch_list[i]))
+labels = unpickle(path_to_cifar_dataset + "batches.meta").get("labels", [])
+
+trainX, trainY = cifar10.load_data()
 
 lb = LabelBinarizer()
 trainY = lb.fit_transform(trainY)
