@@ -1,10 +1,9 @@
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import classification_report
-from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.layers.core import Dense
 from keras.optimizers import SGD
-from keras.datasets import cifar10
+from keras.utils import to_categorical
 import numpy as np
 from matplotlib import pyplot as plt
 import pickle
@@ -17,40 +16,48 @@ def unpickle(file):
     return dict
 
 
-path_to_cifar_dataset = "/home/nik-96/Documents/cifar10/cifar-10-batches-py/"
-batch_list = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5",]
-batch_data = []
-for i in range(len(batch_list)):
-    trainX = unpickle(path_to_cifar_dataset + "{}".format(batch_list[i]))
-labels = unpickle(path_to_cifar_dataset + "batches.meta").get("labels", [])
-
-trainX, trainY = cifar10.load_data()
-
 lb = LabelBinarizer()
-trainY = lb.fit_transform(trainY)
-testY = lb.transform(testY)
+
+path_to_cifar_dataset = "/home/nik/Documents/datasets/cifar10/"
+batch_list = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5",]
+trainX_batches, trainY_batches = [], []
+label_names = unpickle(path_to_cifar_dataset + "batches.meta").get(b"label_names", [])
+test = unpickle(path_to_cifar_dataset + "test_batch")
+testX, testY = test.get(b"data", []), lb.fit_transform(test.get(b"labels", []))
+for i in range(len(batch_list)):
+    train = unpickle(path_to_cifar_dataset + "{}".format(batch_list[i]))
+    trainX_batches.append(train.get(b'data', []))
+    trainY_batches.append(lb.fit_transform(train.get(b'labels', [])))
 
 model = Sequential()
-model.add(Dense(256, input_shape=(784,), activation="sigmoid"))
+model.add(Dense(256, input_shape=(3072,), activation="sigmoid"))
 model.add(Dense(128, activation="sigmoid"))
 model.add(Dense(10, activation="softmax"))
-
-print("[INFO] training network...")
+count = 0
 sgd = SGD(0.01)
 model.compile(loss="categorical_crossentropy", optimizer=sgd, metrics=["accuracy"])
-H = model.fit(trainX, trainY, validation_data=(testX, testY), epochs=100, batch_size=128)
+for (trainX, trainY) in zip(trainX_batches, trainY_batches):
+    print("[INFO] training network...")
+    H = model.fit(trainX, trainY, validation_data=(testX, testY), epochs=20)
+    
+    print("[INFO] evaluating network...")
+    preds = model.predict(testX, batch_size=128)
+    print("***************  Results on {} batch  *****************".format(count))
+    print(classification_report(testY.argmax(axis=1), preds.argmax(axis=1), 
+          target_names=[str(x) for x in label_names]))
+    count += 1
 
-print("[INFO] evaluating network...")
+print("After 5 batches the results are:")
 predictions = model.predict(testX, batch_size=128)
 print(classification_report(testY.argmax(axis=1), predictions.argmax(axis=1),
-target_names=[str(x) for x in lb.classes_]))
+      target_names=[str(x) for x in label_names]))
 
 plt.style.use("ggplot")
 plt.figure()
-plt.plot(np.arange(0, 100), H.history["loss"], label="train_loss")
-plt.plot(np.arange(0, 100), H.history["val_loss"], label="val_loss")
-plt.plot(np.arange(0, 100), H.history["acc"], label="train_acc")
-plt.plot(np.arange(0, 100), H.history["val_acc"], label="val_acc")
+plt.plot(np.arange(0, 20), H.history["loss"], label="train_loss")
+plt.plot(np.arange(0, 20), H.history["val_loss"], label="val_loss")
+plt.plot(np.arange(0, 20), H.history["acc"], label="train_acc")
+plt.plot(np.arange(0, 20), H.history["val_acc"], label="val_acc")
 plt.title("Training Loss and Accuracy")
 plt.xlabel("Epoch #")
 plt.ylabel("Loss/Accuracy")
