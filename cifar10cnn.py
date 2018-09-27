@@ -3,7 +3,7 @@ from sklearn.metrics import classification_report
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Conv2D, MaxPooling2D
-from keras.optimizers import SGD, Adam, RMSprob
+from keras.optimizers import SGD #, Adam, RMSprob
 import numpy as np
 from matplotlib import pyplot as plt
 import pickle
@@ -18,46 +18,60 @@ def unpickle(file):
 
 lb = LabelBinarizer()
 
-path_to_cifar_dataset = "/home/nik-96/Documents/cifar10/cifar-10-batches-py/"
+path_to_cifar_dataset = "/home/nik/Documents/datasets/cifar10/"
 batch_list = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5",]
-trainX_batches, trainY_batches = [], []
+#trainX, trainY = np.array([]), np.array([])
 label_names = unpickle(path_to_cifar_dataset + "batches.meta").get(b"label_names", [])
 test = unpickle(path_to_cifar_dataset + "test_batch")
-testX, testY = test.get(b"data", []), lb.fit_transform(test.get(b"labels", []))
+trainX, trainY = [], []
+testX = np.array([np.array(item).reshape(32, 32, 3) for item in test.get(b"data")])
+testY = np.array([np.array(item) for item in lb.fit_transform(test.get(b"labels", []))])
 for i in range(len(batch_list)):
     train = unpickle(path_to_cifar_dataset + "{}".format(batch_list[i]))
-    trainX_batches.append(train.get(b'data', []))
-    trainY_batches.append(lb.fit_transform(train.get(b'labels', [])))
+    trainX.append(np.array(train.get(b'data', [])).reshape(10000, 32, 32, 3))
+    trainY.append(np.array(lb.fit_transform(train.get(b'labels', []))))
 
-model = Sequential()
-model.add(Conv2D(32, (3, 3), padding="name", input_shape=(32, 32, 3)))
-model.add(Activation('relu'))
-model.add(MaxPooling2D(pool_size=(2, 2)))
-model.add(Dropout(p=0.5))
-model.add(Flatten())
-model.add(Dense(512))
-model.add(Activation('relu'))
-model.add(Dropout(p=0.5))
-model.add(Dense(10, activation="softmax"))
-count = 0
-sgd = SGD(0.01)
-model.compile(loss="categorical_crossentropy", optimizer=sgd, metrics=["accuracy"])
-for (trainX, trainY) in zip(trainX_batches, trainY_batches):
-    print("[INFO] training network...")
-    H = model.fit(trainX, trainY, validation_data=(testX, testY), epochs=20)
+print(np.array(trainX).shape)
+
+def shallownet():
+    # net architecture: INPUT => CONV => ACTIV(RELU) => FC
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), padding="same", input_shape=(32, 32, 3)))
+    model.add(Activation('relu'))
+    model.add(Flatten())
+    model.add(Dense(10))
+    model.add(Activation("softmax"))
+
+    return model
+
+
+def somenet():
+    # net architecture: INPUT => CONV => ACTIV(RELU) => POOLING(MAX) => DO => FLATTEN => FC => ACTIV(RELU) => DO => FC
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), padding="same", input_shape=(32, 32, 3)))
+    model.add(Activation('relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+    model.add(Dropout(p=0.25))
+    model.add(Flatten())
+    model.add(Dense(512))
+    model.add(Activation('relu'))
+    model.add(Dropout(p=0.5))
+    model.add(Dense(10, activation="softmax"))
     
-    print("[INFO] evaluating network...")
-    preds = model.predict(testX, batch_size=128)
-    print("***************  Results on {} batch  *****************".format(count))
-    print(classification_report(testY.argmax(axis=1), preds.argmax(axis=1), 
-          target_names=[str(x) for x in label_names]))
-    count += 1
+    return model
 
-print("After 5 batches the results are:")
-predictions = model.predict(testX, batch_size=128)
-print(classification_report(testY.argmax(axis=1), predictions.argmax(axis=1),
+model = somenet()
+sgd = SGD(0.005)
+model.compile(loss="categorical_crossentropy", optimizer=sgd, metrics=["accuracy"])
+print("[INFO] training network...")
+H = model.fit(trainX, trainY, validation_data=(testX, testY), epochs=20)
+    
+print("[INFO] evaluating network...")
+preds = model.predict(testX, batch_size=128)
+print(classification_report(testY.argmax(axis=1), preds.argmax(axis=1), 
       target_names=[str(x) for x in label_names]))
 
+predictions = model.predict(testX, batch_size=128)
 plt.style.use("ggplot")
 plt.figure()
 plt.plot(np.arange(0, 20), H.history["loss"], label="train_loss")
@@ -68,4 +82,5 @@ plt.title("Training Loss and Accuracy")
 plt.xlabel("Epoch #")
 plt.ylabel("Loss/Accuracy")
 plt.legend()
-plt.savefig("fig.png")
+plt.show()
+#plt.savefig("fig.png")
