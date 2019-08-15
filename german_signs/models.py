@@ -52,6 +52,9 @@ class Flatten(nn.Module):
         return x.view(x.size()[0], -1)
 
 
+# ################ ResNet part ###################
+
+
 class BasicBlock(nn.Module):
     def __init__(self, in_maps, out_maps, downsample=False):
         super(BasicBlock, self).__init__()
@@ -129,6 +132,93 @@ class ResNet(nn.Module):
         out = F.relu(self.dense1(out))
         out = self.dropout(out)
         out = self.dense2(out)
+
+        return out
+
+
+# ######################## DenseNet part #################################
+
+
+class DenseLayer(nn.Module):
+    def __init__(self, in_features, growth_rate, bn_size):
+        super(DenseLayer, self).__init__()
+        self.bn1 = nn.BatchNorm2d(in_features)
+        self.conv1 = nn.Conv2d(in_features, bn_size*growth_rate, (1, 1), stride=1, bias=False)
+
+        self.bn2 = nn.BatchNorm2d(bn_size*growth_rate)
+        self.conv2 = nn.Conv2d(bn_size*growth_rate, growth_rate, (3, 3), stride=1, padding=1, bias=False)
+
+    def forward(self, *x):
+        # x is list of concatenated tensors
+        concat_features = torch.cat(x, dim=1)
+        out = self.conv1(F.relu(self.bn1(concat_features)))
+        out = self.conv2(F.relu(self.bn2(out)))
+
+        return out
+
+
+class Transition(nn.Module):
+    def __init__(self, in_features, out_features):
+        super(Transition, self).__init__()
+        self.bn = nn.BatchNorm2d(in_features)
+        self.conv = nn.Conv2d(in_features, out_features, (1, 1), stride=1, bias=False)
+        self.avg_pool = nn.AvgPool2d((2, 2), stride=2)
+
+    def forward(self, x):
+        out = self.avg_pool(self.conv(F.relu(self.bn(x))))
+
+        return out
+
+
+class DenseBlock(nn.Module):
+    def __init__(self, num_layers, in_features, bn_size, growth_rate):
+        super(DenseBlock, self).__init__()
+        self.layers = []
+        for i in range(num_layers):
+            layer = DenseLayer(in_features + i*growth_rate, growth_rate, bn_size)
+            self.layers.append(layer)
+
+    def forward(self, x):
+        features = [x]
+        for layer in self.layers:
+            out = layer(*features)
+            features.append(out)
+
+        return torch.cat(features, dim=1)
+
+
+class DenseNet(nn.Module):
+    def __init__(self, layers_config, bn_size, growth_rate, compression=0.5):
+        super(DenseNet, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=(7, 7), stride=2, padding=3)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.pool1 = nn.MaxPool2d(kernel_size=(3, 3), stride=1, padding=1)
+
+        self.layers = []
+        in_features = 64
+        for num_layers in layers_config[:-1]:
+            print("Number of features is", in_features)
+            self.layers.append(DenseBlock(num_layers, in_features, bn_size, growth_rate))
+            in_features += num_layers * growth_rate
+            self.layers.append(Transition(in_features, int(in_features*compression)))
+            in_features = int(in_features*compression)
+
+        print("Number of features is", in_features)
+
+        self.layers.append(DenseBlock(layers_config[-1], in_features, bn_size, growth_rate))
+        self.layers.append(Flatten())
+        print("Number of features is", in_features + layers_config[-1]*growth_rate)
+        self.layers.append(nn.Linear(3*3*(in_features + layers_config[-1]*growth_rate), 200))
+        self.layers.append(nn.ReLU())
+        self.layers.append(nn.Linear(200, 43))
+        self.layer = nn.Sequential(*self.layers)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.pool1(out)
+        out = self.layer(out)
 
         return out
 

@@ -29,7 +29,7 @@ def readTrafficSigns(rootpath):
         with open(prefix + 'GT-' + format(c, '05d') + '.csv') as f:
             data = f.read().split('\n')[1:-1]
         # loop over all images in current annotations file
-        for row_ in data:
+        for row_ in data[:5]:
             # TODO: make use of ROI data from csv file
             row = row_.split(';')
             image = np.array(resizer(Image.open(prefix + row[0])))
@@ -37,7 +37,7 @@ def readTrafficSigns(rootpath):
                 img = convertScaleAbs(image, alpha=1.5, beta=6)
                 images.append(torch.FloatTensor(img.reshape(img.shape[2], img.shape[0], img.shape[1])))
                 labels.append(int(row[7]))
-            img = gamma_adjust(image, 0.4) # convertScaleAbs(image, alpha=1.5, beta=6)
+            img = gamma_adjust(image, 0.4)  # convertScaleAbs(image, alpha=1.5, beta=6)
             images.append(torch.FloatTensor(img.reshape(img.shape[2], img.shape[0], img.shape[1])))
             labels.append(int(row[7]))
             shapes.append(image.size)

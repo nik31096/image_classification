@@ -6,19 +6,19 @@ from matplotlib import pyplot as plt
 from tqdm import trange
 
 from open_images import readTrafficSigns
-from models import FCN, ResNet
+from models import FCN, ResNet, DenseNet
 
 
 if __name__ == '__main__':
     device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
     trainX, trainY = readTrafficSigns('../../../datasets/german_signs/GTSRB/Final_Training/Images')
     criterion = torch.nn.CrossEntropyLoss()
-    model = ResNet().to(device)
+    model = DenseNet(layers_config=(6, 12, 24, 16), bn_size=1, growth_rate=32)  # ResNet().to(device)
     opt = torch.optim.Adam(model.parameters(), lr=0.0005)
 
     print("[INFO] Training")
     model.train(True)
-    batch_size = 256
+    batch_size = 32
     losses = []
     episodes = 6000
 
