@@ -29,7 +29,7 @@ def readTrafficSigns(rootpath):
         with open(prefix + 'GT-' + format(c, '05d') + '.csv') as f:
             data = f.read().split('\n')[1:-1]
         # loop over all images in current annotations file
-        for row_ in data[:5]:
+        for row_ in data:
             # TODO: make use of ROI data from csv file
             row = row_.split(';')
             image = np.array(resizer(Image.open(prefix + row[0])))

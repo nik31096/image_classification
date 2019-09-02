@@ -4,7 +4,7 @@ from torchvision import transforms
 
 import numpy as np
 from PIL import Image
-from models import ResNet
+from models import ResNet, DenseNet
 
 from pprint import pprint
 import time
@@ -32,15 +32,17 @@ def read_test(test_dir):
 
 X, Y = read_test('/data/home/n.kostin/datasets/german_signs/test')
 
-model = ResNet()
-model.load_state_dict(torch.load('./resnet_model_adam_0005_128_2k_adam_00005_2k_gamma_04_a_15_b_6.pt'))
+model = DenseNet(layers_config=(6, 12, 24, 16), bn_size=4, growth_rate=32)
+model.load_state_dict(torch.load('./densenet_1.pt'))
 
 # pprint([param.nelement() for param in model.parameters()])  # TODO: add model parameters print
 
 print("[INFO] Testing")
 model.eval()
 start = time.time()
-preds = list(torch.argmax(F.softmax(model(torch.FloatTensor(X)), dim=1), dim=1).cpu().data.numpy())
+preds = torch.argmax(F.softmax(model(torch.FloatTensor(X)), dim=1), dim=1)
+
+preds = preds.data.numpy()
 print(f"Network inference time is {time.time() - start}")
 print("F1-score micro: ", f1_score(Y, preds, average='micro'))
 print("F1-score macro: ", f1_score(Y, preds, average='macro'))

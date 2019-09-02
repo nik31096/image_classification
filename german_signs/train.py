@@ -10,15 +10,16 @@ from models import FCN, ResNet, DenseNet
 
 
 if __name__ == '__main__':
-    device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
-    trainX, trainY = readTrafficSigns('../../../datasets/german_signs/GTSRB/Final_Training/Images')
+    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    trainX, trainY = readTrafficSigns('/data/home/n.kostin/datasets/german_signs/GTSRB/Final_Training/Images')
     criterion = torch.nn.CrossEntropyLoss()
-    model = DenseNet(layers_config=(6, 12, 24, 16), bn_size=1, growth_rate=32)  # ResNet().to(device)
+    model = DenseNet(layers_config=(6, 12, 24, 16), bn_size=4, growth_rate=32, device=device)  # ResNet().to(device)
     opt = torch.optim.Adam(model.parameters(), lr=0.0005)
 
     print("[INFO] Training")
+    print(device)
     model.train(True)
-    batch_size = 32
+    batch_size = 256
     losses = []
     episodes = 6000
 
@@ -37,4 +38,5 @@ if __name__ == '__main__':
             print(f"-> {episode} episode, loss = {losses[-1]}")
         if episode > 3000:
             opt = torch.optim.Adam(model.parameters(), lr=0.00001)
-    torch.save(model.state_dict(), './resnet_model_adam_0005_128_2k_adam_00005_2k_gamma_04_a_15_b_6.pt')
+        if episode % 1000 == 0 and episode != 0:
+            torch.save(model.state_dict(), './densenet_1.pt')
